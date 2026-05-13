@@ -2,6 +2,7 @@ import asyncio
 import os
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ChatType
@@ -13,6 +14,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
+from aiogram.types.input_file import FSInputFile
 
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -27,6 +29,11 @@ if SUPPORT_CHAT_ID:
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
+
+# ---------------- КАРТИНКА ДЛЯ ПРИВЕТСТВИЯ ----------------
+
+WELCOME_IMAGE = "f603e39e58f392f60bad5.jpg"
 
 
 # ---------------- ССЫЛКИ НА ДОКУМЕНТЫ ----------------
@@ -63,15 +70,6 @@ cursor.execute(
     """
 )
 
-cursor.execute(
-    """
-    CREATE TABLE IF NOT EXISTS acknowledged_users (
-        user_id INTEGER PRIMARY KEY,
-        created_at TEXT
-    )
-    """
-)
-
 conn.commit()
 
 
@@ -100,35 +98,12 @@ def get_user_id_by_support_message(support_message_id: int):
     return result[0] if result else None
 
 
-def load_acknowledged_users():
-    cursor.execute("SELECT user_id FROM acknowledged_users")
-    rows = cursor.fetchall()
-    return {row[0] for row in rows}
-
-
-ACKNOWLEDGED_USERS = load_acknowledged_users()
-
-
-def should_send_first_message_reply(user_id: int) -> bool:
-    if user_id in ACKNOWLEDGED_USERS:
-        return False
-
-    ACKNOWLEDGED_USERS.add(user_id)
-
+def has_user_written_before(user_id: int) -> bool:
     cursor.execute(
-        """
-        INSERT OR REPLACE INTO acknowledged_users
-        (user_id, created_at)
-        VALUES (?, ?)
-        """,
-        (
-            user_id,
-            datetime.now().isoformat(timespec="seconds"),
-        ),
+        "SELECT 1 FROM message_map WHERE user_id = ? LIMIT 1",
+        (user_id,),
     )
-    conn.commit()
-
-    return True
+    return cursor.fetchone() is not None
 
 
 # ---------------- ТЕКСТЫ ----------------
@@ -306,17 +281,44 @@ def guides_menu():
     )
 
 
+# ---------------- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ МЕНЮ ----------------
+
+async def edit_menu_message(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMarkup):
+    if callback.message.photo:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=keyboard,
+        )
+    else:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboard,
+        )
+
+
 # ---------------- КОМАНДЫ ----------------
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer(WELCOME_TEXT, reply_markup=main_menu())
+    if Path(WELCOME_IMAGE).exists():
+        photo = FSInputFile(WELCOME_IMAGE)
+
+        await message.answer_photo(
+            photo=photo,
+            caption=WELCOME_TEXT,
+            reply_markup=main_menu(),
+        )
+    else:
+        await message.answer(
+            WELCOME_TEXT,
+            reply_markup=main_menu(),
+        )
 
 
 @dp.message(Command("info"))
 async def info_command(message: Message):
     await message.answer(
-        "Выберите нужный раздел:",
+        WELCOME_TEXT,
         reply_markup=main_menu(),
     )
 
@@ -330,45 +332,50 @@ async def chat_id_command(message: Message):
 
 @dp.callback_query(F.data == "menu_main")
 async def open_main_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "Главное меню:",
-        reply_markup=main_menu(),
+    await edit_menu_message(
+        callback,
+        WELCOME_TEXT,
+        main_menu(),
     )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_info")
 async def open_info_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await edit_menu_message(
+        callback,
         "📌 Основная информация:",
-        reply_markup=info_menu(),
+        info_menu(),
     )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_bio")
 async def open_bio_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await edit_menu_message(
+        callback,
         "📝 Документы для написания биографии:",
-        reply_markup=bio_menu(),
+        bio_menu(),
     )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_wasteland")
 async def open_wasteland_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await edit_menu_message(
+        callback,
         "🏜 Описание пустоши:",
-        reply_markup=wasteland_menu(),
+        wasteland_menu(),
     )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_guides")
 async def open_guides_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await edit_menu_message(
+        callback,
         "📚 Гайды:",
-        reply_markup=guides_menu(),
+        guides_menu(),
     )
     await callback.answer()
 
@@ -421,6 +428,8 @@ async def message_from_user(message: Message):
 
     user = message.from_user
 
+    is_first_message = not has_user_written_before(user.id)
+
     username = f"@{user.username}" if user.username else "без username"
     full_name = user.full_name or "без имени"
 
@@ -456,7 +465,7 @@ async def message_from_user(message: Message):
 
     save_message_map(copied.message_id, user.id)
 
-    if should_send_first_message_reply(user.id):
+    if is_first_message:
         await message.answer(FIRST_MESSAGE_REPLY)
 
 
