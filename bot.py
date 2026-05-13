@@ -63,6 +63,16 @@ cursor.execute(
     )
     """
 )
+
+cursor.execute(
+    """
+    CREATE TABLE IF NOT EXISTS acknowledged_users (
+        user_id INTEGER PRIMARY KEY,
+        created_at TEXT
+    )
+    """
+)
+
 conn.commit()
 
 
@@ -91,6 +101,30 @@ def get_user_id_by_support_message(support_message_id: int):
     return result[0] if result else None
 
 
+def has_user_been_acknowledged(user_id: int) -> bool:
+    cursor.execute(
+        "SELECT user_id FROM acknowledged_users WHERE user_id = ?",
+        (user_id,),
+    )
+    result = cursor.fetchone()
+    return result is not None
+
+
+def mark_user_as_acknowledged(user_id: int):
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO acknowledged_users
+        (user_id, created_at)
+        VALUES (?, ?)
+        """,
+        (
+            user_id,
+            datetime.now().isoformat(timespec="seconds"),
+        ),
+    )
+    conn.commit()
+
+
 # ---------------- ТЕКСТЫ ----------------
 
 WELCOME_TEXT = (
@@ -100,6 +134,12 @@ WELCOME_TEXT = (
     "Чтобы забронировать роль, напишите её сообщением "
     "или задайте интересующий вопрос — я помогу не хуже "
     "синта третьего поколения!"
+)
+
+
+FIRST_MESSAGE_REPLY = (
+    "Ваше сообщение передано Волт-Бою 🫡\n"
+    "Мы ответим вам здесь, в этом чате."
 )
 
 
@@ -413,10 +453,9 @@ async def message_from_user(message: Message):
 
     save_message_map(copied.message_id, user.id)
 
-    await message.answer(
-        "Ваше сообщение передано Волт-Бою 🫡\n"
-        "Мы ответим вам здесь, в этом чате."
-    )
+    if not has_user_been_acknowledged(user.id):
+        await message.answer(FIRST_MESSAGE_REPLY)
+        mark_user_as_acknowledged(user.id)
 
 
 # ---------------- ЗАПУСК БОТА ----------------
