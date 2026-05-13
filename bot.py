@@ -30,7 +30,6 @@ dp = Dispatcher()
 
 
 # ---------------- ССЫЛКИ НА ДОКУМЕНТЫ ----------------
-# Часть ссылок уже настоящая, остальные пока тестовые.
 
 LINK_SETTING = "https://telegra.ph/Setting-12-28-5"
 LINK_PLOT = "https://telegra.ph/Main-plot-12-28"
@@ -101,16 +100,21 @@ def get_user_id_by_support_message(support_message_id: int):
     return result[0] if result else None
 
 
-def has_user_been_acknowledged(user_id: int) -> bool:
-    cursor.execute(
-        "SELECT user_id FROM acknowledged_users WHERE user_id = ?",
-        (user_id,),
-    )
-    result = cursor.fetchone()
-    return result is not None
+def load_acknowledged_users():
+    cursor.execute("SELECT user_id FROM acknowledged_users")
+    rows = cursor.fetchall()
+    return {row[0] for row in rows}
 
 
-def mark_user_as_acknowledged(user_id: int):
+ACKNOWLEDGED_USERS = load_acknowledged_users()
+
+
+def should_send_first_message_reply(user_id: int) -> bool:
+    if user_id in ACKNOWLEDGED_USERS:
+        return False
+
+    ACKNOWLEDGED_USERS.add(user_id)
+
     cursor.execute(
         """
         INSERT OR REPLACE INTO acknowledged_users
@@ -123,6 +127,8 @@ def mark_user_as_acknowledged(user_id: int):
         ),
     )
     conn.commit()
+
+    return True
 
 
 # ---------------- ТЕКСТЫ ----------------
@@ -411,9 +417,6 @@ async def answer_from_support_chat(message: Message):
 @dp.message(F.chat.type == ChatType.PRIVATE)
 async def message_from_user(message: Message):
     if not SUPPORT_CHAT_ID:
-        await message.answer(
-            "Сообщение принято, но чат поддержки пока не подключён."
-        )
         return
 
     user = message.from_user
@@ -453,8 +456,7 @@ async def message_from_user(message: Message):
 
     save_message_map(copied.message_id, user.id)
 
-    if not has_user_been_acknowledged(user.id):
-        mark_user_as_acknowledged(user.id)
+    if should_send_first_message_reply(user.id):
         await message.answer(FIRST_MESSAGE_REPLY)
 
 
