@@ -5,13 +5,14 @@ from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ChatType
+from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
+    CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
 )
-from aiogram.exceptions import TelegramForbiddenError
 
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -28,7 +29,28 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
-# ---------- База для связи сообщений ----------
+# ---------------- ССЫЛКИ НА ДОКУМЕНТЫ ----------------
+# Часть ссылок уже настоящая, остальные пока тестовые.
+
+LINK_SETTING = "https://telegra.ph/Setting-12-28-5"
+LINK_PLOT = "https://telegra.ph/Main-plot-12-28"
+LINK_CLASSIFICATION = "https://example.com/classification"
+LINK_RULES = "https://telegra.ph/Rules-12-28-96"
+LINK_FAQ = "https://telegra.ph/FAQ-08-03-25"
+
+LINK_VAULTS = "https://example.com/vaults"
+
+LINK_MISSISSIPPI = "https://example.com/mississippi"
+LINK_LOUISIANA = "https://example.com/louisiana"
+LINK_EAST_TEXAS = "https://example.com/east-texas"
+LINK_WEST_TEXAS = "https://example.com/west-texas"
+
+LINK_PROJECT_GUIDE = "https://example.com/project-guide"
+LINK_DND_GUIDE = "https://example.com/dnd-guide"
+
+
+# ---------------- БАЗА ДЛЯ СВЯЗИ СООБЩЕНИЙ ----------------
+
 conn = sqlite3.connect("support_messages.db")
 cursor = conn.cursor()
 
@@ -37,7 +59,6 @@ cursor.execute(
     CREATE TABLE IF NOT EXISTS message_map (
         support_message_id INTEGER PRIMARY KEY,
         user_id INTEGER NOT NULL,
-        user_info TEXT,
         created_at TEXT
     )
     """
@@ -45,17 +66,16 @@ cursor.execute(
 conn.commit()
 
 
-def save_message_map(support_message_id: int, user_id: int, user_info: str):
+def save_message_map(support_message_id: int, user_id: int):
     cursor.execute(
         """
-        INSERT OR REPLACE INTO message_map 
-        (support_message_id, user_id, user_info, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT OR REPLACE INTO message_map
+        (support_message_id, user_id, created_at)
+        VALUES (?, ?, ?)
         """,
         (
             support_message_id,
             user_id,
-            user_info,
             datetime.now().isoformat(timespec="seconds"),
         ),
     )
@@ -71,67 +91,187 @@ def get_user_id_by_support_message(support_message_id: int):
     return result[0] if result else None
 
 
-# ---------- Кнопки ----------
-def main_keyboard():
+# ---------------- ТЕКСТЫ ----------------
+
+WELCOME_TEXT = (
+    "Привет! Я — Волт-Бой на Вашем наручном компьютере "
+    "и по совместительству Ваш главный помощник по выживанию "
+    "и построению счастливой жизни в этом мире.\n\n"
+    "Чтобы забронировать роль, напишите её сообщением "
+    "или задайте интересующий вопрос — я помогу не хуже "
+    "синта третьего поколения!"
+)
+
+
+# ---------------- МЕНЮ ----------------
+
+def main_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="📌 О проекте",
-                    url="https://t.me/dawnofthed3ad",
+                    text="📌 Основная информация",
+                    callback_data="menu_info",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="📄 Основная информация",
-                    url="https://example.com/main-info",
+                    text="📝 Документы для написания биографии",
+                    callback_data="menu_bio",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="📝 Документы проекта",
-                    url="https://example.com/documents",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="❓ Частые вопросы",
-                    url="https://example.com/faq",
+                    text="📚 Гайды",
+                    callback_data="menu_guides",
                 )
             ],
         ]
     )
 
 
-WELCOME_TEXT = (
-    "Привет! Я — Волт-Бой, Ваш главный помощник по выживанию "
-    "и формированию счастливой жизни в этом мире.\n\n"
-    "Можете написать желаемую роль или задать любой интересующий вопрос, "
-    "а я помогу не хуже наручного Пип-Боя!\n\n"
-    "Ознакомиться с самим проектом можно здесь: @dawnofthed3ad"
-)
+def info_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🌍 Сеттинг",
+                    url=LINK_SETTING,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📖 Сюжет",
+                    url=LINK_PLOT,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📋 Классификация",
+                    url=LINK_CLASSIFICATION,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⚖️ Правила",
+                    url=LINK_RULES,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❓ FAQ",
+                    url=LINK_FAQ,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="menu_main",
+                )
+            ],
+        ]
+    )
 
 
-# ---------- Команды ----------
+def bio_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🏠 Описание бункеров",
+                    url=LINK_VAULTS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🏜 Описание пустоши",
+                    callback_data="menu_wasteland",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="menu_main",
+                )
+            ],
+        ]
+    )
+
+
+def wasteland_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📍 Миссисипи",
+                    url=LINK_MISSISSIPPI,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📍 Луизиана",
+                    url=LINK_LOUISIANA,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📍 Восточный Техас",
+                    url=LINK_EAST_TEXAS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📍 Западный Техас",
+                    url=LINK_WEST_TEXAS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="menu_bio",
+                )
+            ],
+        ]
+    )
+
+
+def guides_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📘 Гайд по проекту",
+                    url=LINK_PROJECT_GUIDE,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎲 Гайд по ДнД",
+                    url=LINK_DND_GUIDE,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="menu_main",
+                )
+            ],
+        ]
+    )
+
+
+# ---------------- КОМАНДЫ ----------------
+
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer(WELCOME_TEXT, reply_markup=main_keyboard())
-
-
-@dp.message(Command("help"))
-async def help_command(message: Message):
-    await message.answer(
-        "Напишите сюда желаемую роль или любой вопрос — я передам сообщение администрации проекта.\n\n"
-        "Также можно открыть основную информацию по кнопкам ниже.",
-        reply_markup=main_keyboard(),
-    )
+    await message.answer(WELCOME_TEXT, reply_markup=main_menu())
 
 
 @dp.message(Command("info"))
 async def info_command(message: Message):
     await message.answer(
-        "Основная информация по проекту:",
-        reply_markup=main_keyboard(),
+        "Выберите нужный раздел:",
+        reply_markup=main_menu(),
     )
 
 
@@ -140,7 +280,55 @@ async def chat_id_command(message: Message):
     await message.answer(f"ID этого чата: {message.chat.id}")
 
 
-# ---------- Ответ из чата поддержки пользователю ----------
+# ---------------- НАЖАТИЯ НА КНОПКИ МЕНЮ ----------------
+
+@dp.callback_query(F.data == "menu_main")
+async def open_main_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "Главное меню:",
+        reply_markup=main_menu(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_info")
+async def open_info_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "📌 Основная информация:",
+        reply_markup=info_menu(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_bio")
+async def open_bio_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "📝 Документы для написания биографии:",
+        reply_markup=bio_menu(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_wasteland")
+async def open_wasteland_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "🏜 Описание пустоши:",
+        reply_markup=wasteland_menu(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_guides")
+async def open_guides_menu(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "📚 Гайды:",
+        reply_markup=guides_menu(),
+    )
+    await callback.answer()
+
+
+# ---------------- ОТВЕТ ИЗ ЧАТА ПОДДЕРЖКИ ПОЛЬЗОВАТЕЛЮ ----------------
+
 @dp.message(F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
 async def answer_from_support_chat(message: Message):
     if not SUPPORT_CHAT_ID:
@@ -178,7 +366,8 @@ async def answer_from_support_chat(message: Message):
         )
 
 
-# ---------- Сообщение от пользователя в бота ----------
+# ---------------- СООБЩЕНИЕ ОТ ПОЛЬЗОВАТЕЛЯ В БОТА ----------------
+
 @dp.message(F.chat.type == ChatType.PRIVATE)
 async def message_from_user(message: Message):
     if not SUPPORT_CHAT_ID:
@@ -208,11 +397,7 @@ async def message_from_user(message: Message):
         ),
     )
 
-    save_message_map(
-        support_message_id=header.message_id,
-        user_id=user.id,
-        user_info=user_info,
-    )
+    save_message_map(header.message_id, user.id)
 
     if message.text:
         copied = await bot.send_message(
@@ -226,17 +411,15 @@ async def message_from_user(message: Message):
             message_id=message.message_id,
         )
 
-    save_message_map(
-        support_message_id=copied.message_id,
-        user_id=user.id,
-        user_info=user_info,
-    )
+    save_message_map(copied.message_id, user.id)
 
     await message.answer(
         "Ваше сообщение передано Волт-Бою 🫡\n"
         "Мы ответим вам здесь, в этом чате."
     )
 
+
+# ---------------- ЗАПУСК БОТА ----------------
 
 async def main():
     await dp.start_polling(bot)
