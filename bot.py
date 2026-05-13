@@ -454,8 +454,8 @@ async def message_from_user(message: Message):
     save_message_map(copied.message_id, user.id)
 
     if not has_user_been_acknowledged(user.id):
-        await message.answer(FIRST_MESSAGE_REPLY)
         mark_user_as_acknowledged(user.id)
+        await message.answer(FIRST_MESSAGE_REPLY)
 
 
 # ---------------- ЗАПУСК БОТА ----------------
