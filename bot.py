@@ -266,25 +266,25 @@ def main_menu():
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="📌 Основная информация",
+                    text="☢️ Основная информация",
                     callback_data="menu_info",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="📝 Документы для написания биографии",
+                    text="🏷️ Документы для написания биографии",
                     callback_data="menu_bio",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="📚 Гайды",
+                    text="📺 Гайды",
                     callback_data="menu_guides",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="📊 Таблицы для игроков",
+                    text="📂 Таблицы для игроков",
                     callback_data="menu_tables",
                 )
             ],
@@ -295,11 +295,11 @@ def main_menu():
 def info_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🌍 Сеттинг", url=LINK_SETTING)],
-            [InlineKeyboardButton(text="📖 Сюжет", url=LINK_PLOT)],
-            [InlineKeyboardButton(text="📋 Классификация", url=LINK_CLASSIFICATION)],
+            [InlineKeyboardButton(text="📟 Сеттинг", url=LINK_SETTING)],
+            [InlineKeyboardButton(text="🧶 Сюжет", url=LINK_PLOT)],
+            [InlineKeyboardButton(text="🧟‍♂️ Классификация", url=LINK_CLASSIFICATION)],
             [InlineKeyboardButton(text="⚖️ Правила", url=LINK_RULES)],
-            [InlineKeyboardButton(text="❓ FAQ", url=LINK_FAQ)],
+            [InlineKeyboardButton(text="📖 FAQ", url=LINK_FAQ)],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_main")],
         ]
     )
@@ -308,7 +308,7 @@ def info_menu():
 def bio_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏠 Описание бункеров", url=LINK_VAULTS)],
+            [InlineKeyboardButton(text="🪴 Описание бункеров", url=LINK_VAULTS)],
             [
                 InlineKeyboardButton(
                     text="🏜 Описание пустоши",
@@ -323,10 +323,10 @@ def bio_menu():
 def wasteland_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📍 Миссисипи", url=LINK_MISSISSIPPI)],
-            [InlineKeyboardButton(text="📍 Луизиана", url=LINK_LOUISIANA)],
-            [InlineKeyboardButton(text="📍 Восточный Техас", url=LINK_EAST_TEXAS)],
-            [InlineKeyboardButton(text="📍 Западный Техас", url=LINK_WEST_TEXAS)],
+            [InlineKeyboardButton(text="🛤️ Миссисипи", url=LINK_MISSISSIPPI)],
+            [InlineKeyboardButton(text="🪸 Луизиана", url=LINK_LOUISIANA)],
+            [InlineKeyboardButton(text="🗻 Восточный Техас", url=LINK_EAST_TEXAS)],
+            [InlineKeyboardButton(text="🦂 Западный Техас", url=LINK_WEST_TEXAS)],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_bio")],
         ]
     )
@@ -347,19 +347,19 @@ def tables_menu():
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="📅 Таблица дедлайнов и рестов",
+                    text="🗓️ Таблица дедлайнов и рестов",
                     url=LINK_DEADLINES_RESTS,
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="💰 Таблица крышек",
+                    text="🪙 Таблица крышек",
                     url=LINK_CAPS,
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="📊 Сводка характеристик персонажей",
+                    text="🧮 Сводка характеристик персонажей",
                     url=LINK_CHARACTER_STATS,
                 )
             ],
@@ -474,7 +474,7 @@ async def open_main_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "menu_info")
 async def open_info_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "📌 Основная информация:", info_menu())
+    await edit_menu_message(callback, "☢️ Основная информация:", info_menu())
     await callback.answer()
 
 
@@ -482,7 +482,7 @@ async def open_info_menu(callback: CallbackQuery):
 async def open_bio_menu(callback: CallbackQuery):
     await edit_menu_message(
         callback,
-        "📝 Документы для написания биографии:",
+        "🏷️ Документы для написания биографии:",
         bio_menu(),
     )
     await callback.answer()
@@ -496,13 +496,13 @@ async def open_wasteland_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "menu_guides")
 async def open_guides_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "📚 Гайды:", guides_menu())
+    await edit_menu_message(callback, "📺 Гайды:", guides_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_tables")
 async def open_tables_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "📊 Таблицы для игроков:", tables_menu())
+    await edit_menu_message(callback, "📂 Таблицы для игроков:", tables_menu())
     await callback.answer()
 
 
@@ -679,6 +679,9 @@ async def handle_support_chat_message(message: Message):
 
 @dp.message(F.chat.type == ChatType.PRIVATE)
 async def message_from_user(message: Message):
+    if message.text and message.text.startswith("/"):
+        return
+
     user = message.from_user
 
     if is_user_blocked(user.id):
