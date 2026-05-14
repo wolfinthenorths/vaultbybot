@@ -709,7 +709,6 @@ async def message_from_user(message: Message):
             "Можно ответить вручную через Reply "
             "или нажать кнопку с готовым шаблоном ниже."
         ),
-        reply_markup=support_actions_keyboard(),
     )
 
     save_message_map(header.message_id, user.id)
