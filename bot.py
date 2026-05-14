@@ -38,19 +38,23 @@ WELCOME_IMAGE = "https://raw.githubusercontent.com/wolfinthenorths/vaultbybot/ma
 
 LINK_SETTING = "https://telegra.ph/Setting-12-28-5"
 LINK_PLOT = "https://telegra.ph/Main-plot-12-28"
-LINK_CLASSIFICATION = "https://example.com/classification"
+LINK_CLASSIFICATION = "https://telegra.ph/Classification-05-14-8"
 LINK_RULES = "https://telegra.ph/Rules-12-28-96"
 LINK_FAQ = "https://telegra.ph/FAQ-08-03-25"
 
-LINK_VAULTS = "https://example.com/vaults"
+LINK_VAULTS = "https://telegra.ph/List-of-bunkers-07-15"
 
-LINK_MISSISSIPPI = "https://example.com/mississippi"
-LINK_LOUISIANA = "https://example.com/louisiana"
-LINK_EAST_TEXAS = "https://example.com/east-texas"
-LINK_WEST_TEXAS = "https://example.com/west-texas"
+LINK_MISSISSIPPI = "https://telegra.ph/Wasteland-Mississippi-02-15"
+LINK_LOUISIANA = "https://telegra.ph/Wasteland-Louisiana-02-08"
+LINK_EAST_TEXAS = "https://telegra.ph/Wasteland-Texas-02-13"
+LINK_WEST_TEXAS = "https://telegra.ph/Wasteland-Texas--part-two-02-13"
 
 LINK_PROJECT_GUIDE = "https://example.com/project-guide"
-LINK_DND_GUIDE = "https://example.com/dnd-guide"
+LINK_DND_GUIDE = "https://telegra.ph/DD-Guide-09-04"
+
+LINK_DEADLINES_RESTS = "https://docs.google.com/spreadsheets/d/10LewYnGJlR2BjWXj7mFiuBraQYppn9yBbJMXwcbT6HA/edit?usp=sharing"
+LINK_CAPS = "https://docs.google.com/spreadsheets/d/1iuFkiLPEaA770-iBCLJKuHaLkCY-_43GpY4xcrcwaX4/edit?usp=sharing"
+LINK_CHARACTER_STATS = "https://docs.google.com/spreadsheets/d/1cYEfxasIAu61BtAQEZBHV4yV5Ghm7_-BL_SsSFoiBG8/edit?usp=sharing"
 
 
 # ---------------- ШАБЛОНЫ БЫСТРЫХ ОТВЕТОВ ----------------
@@ -278,6 +282,12 @@ def main_menu():
                     callback_data="menu_guides",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="📊 Таблицы для игроков",
+                    callback_data="menu_tables",
+                )
+            ],
         ]
     )
 
@@ -327,6 +337,32 @@ def guides_menu():
         inline_keyboard=[
             [InlineKeyboardButton(text="📘 Гайд по проекту", url=LINK_PROJECT_GUIDE)],
             [InlineKeyboardButton(text="🎲 Гайд по ДнД", url=LINK_DND_GUIDE)],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_main")],
+        ]
+    )
+
+
+def tables_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📅 Таблица дедлайнов и рестов",
+                    url=LINK_DEADLINES_RESTS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="💰 Таблица крышек",
+                    url=LINK_CAPS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📊 Сводка характеристик персонажей",
+                    url=LINK_CHARACTER_STATS,
+                )
+            ],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_main")],
         ]
     )
@@ -464,12 +500,21 @@ async def open_guides_menu(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data == "menu_tables")
+async def open_tables_menu(callback: CallbackQuery):
+    await edit_menu_message(callback, "📊 Таблицы для игроков:", tables_menu())
+    await callback.answer()
+
+
 # ---------------- НАЖАТИЯ НА АДМИНСКИЕ КНОПКИ ----------------
 
 @dp.callback_query(F.data.startswith("tpl:"))
 async def send_template_to_user(callback: CallbackQuery):
     if callback.message.chat.id != SUPPORT_CHAT_ID:
-        await callback.answer("Эта кнопка работает только в чате поддержки.", show_alert=True)
+        await callback.answer(
+            "Эта кнопка работает только в чате поддержки.",
+            show_alert=True,
+        )
         return
 
     user_id = get_user_id_by_support_message(callback.message.message_id)
@@ -491,7 +536,14 @@ async def send_template_to_user(callback: CallbackQuery):
 
     try:
         await bot.send_message(chat_id=user_id, text=text)
-        await callback.answer("✅ Шаблон отправлен пользователю.")
+
+        await callback.message.reply(
+            "✅ Доставлено пользователю:\n\n"
+            f"{text}"
+        )
+
+        await callback.answer("✅ Доставлено")
+
     except TelegramForbiddenError:
         await callback.answer(
             "Пользователь заблокировал бота.",
@@ -502,7 +554,10 @@ async def send_template_to_user(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("admin:"))
 async def admin_action(callback: CallbackQuery):
     if callback.message.chat.id != SUPPORT_CHAT_ID:
-        await callback.answer("Эта кнопка работает только в чате поддержки.", show_alert=True)
+        await callback.answer(
+            "Эта кнопка работает только в чате поддержки.",
+            show_alert=True,
+        )
         return
 
     user_id = get_user_id_by_support_message(callback.message.message_id)
@@ -598,6 +653,11 @@ async def handle_support_chat_message(message: Message):
     try:
         if message.text:
             await bot.send_message(chat_id=user_id, text=message.text)
+
+            await message.reply(
+                "✅ Доставлено пользователю:\n\n"
+                f"{message.text}"
+            )
         else:
             await bot.copy_message(
                 chat_id=user_id,
@@ -605,7 +665,9 @@ async def handle_support_chat_message(message: Message):
                 message_id=message.message_id,
             )
 
-        await message.reply("✅ Ответ отправлен пользователю.")
+            await message.reply(
+                "✅ Доставлено пользователю: вложение / медиа / файл."
+            )
 
     except TelegramForbiddenError:
         await message.reply(
