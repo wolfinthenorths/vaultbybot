@@ -42,12 +42,22 @@ LINK_CLASSIFICATION = "https://telegra.ph/Classification-05-14-8"
 LINK_RULES = "https://telegra.ph/Rules-12-28-96"
 LINK_FAQ = "https://telegra.ph/FAQ-08-03-25"
 
+LINK_ORGANIZATIONS = "https://telegra.ph/Organizations-07-15"
 LINK_VAULTS = "https://telegra.ph/List-of-bunkers-07-15"
 
 LINK_MISSISSIPPI = "https://telegra.ph/Wasteland-Mississippi-02-15"
 LINK_LOUISIANA = "https://telegra.ph/Wasteland-Louisiana-02-08"
 LINK_EAST_TEXAS = "https://telegra.ph/Wasteland-Texas-02-13"
 LINK_WEST_TEXAS = "https://telegra.ph/Wasteland-Texas--part-two-02-13"
+
+LINK_TECHNOLOGIES = "https://telegra.ph/Technologies-05-23-22"
+LINK_ROBOTS = "https://telegra.ph/Robots-05-23-23"
+LINK_MEDICINE = "https://telegra.ph/Medicine-05-23-25"
+LINK_CULTURE = "https://telegra.ph/Culture-05-23-20"
+LINK_BESTIARY = "https://telegra.ph/Bestiary-05-23"
+LINK_WEAPONS_MAIN = "https://telegra.ph/Weapons-05-19-12"
+LINK_WEAPONS_CHEMICAL = "https://telegra.ph/Weapons-Chemical-Raiders--Defensive-systems-05-19"
+LINK_ARMOR = "https://telegra.ph/Armor-05-19-10"
 
 LINK_PROJECT_GUIDE = "https://example.com/project-guide"
 LINK_DND_GUIDE = "https://telegra.ph/DD-Guide-09-04"
@@ -278,6 +288,12 @@ def main_menu():
             ],
             [
                 InlineKeyboardButton(
+                    text="🗺️ Научно-технический прогресс мира",
+                    callback_data="menu_progress",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="📺 Гайды",
                     callback_data="menu_guides",
                 )
@@ -308,6 +324,7 @@ def info_menu():
 def bio_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text="⚙️ Организации", url=LINK_ORGANIZATIONS)],
             [InlineKeyboardButton(text="🪴 Описание бункеров", url=LINK_VAULTS)],
             [
                 InlineKeyboardButton(
@@ -328,6 +345,60 @@ def wasteland_menu():
             [InlineKeyboardButton(text="🗻 Восточный Техас", url=LINK_EAST_TEXAS)],
             [InlineKeyboardButton(text="🦂 Западный Техас", url=LINK_WEST_TEXAS)],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_bio")],
+        ]
+    )
+
+
+def progress_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🗜️ Технологии", url=LINK_TECHNOLOGIES)],
+            [InlineKeyboardButton(text="👾 Роботы", url=LINK_ROBOTS)],
+            [InlineKeyboardButton(text="⛑️ Медицина", url=LINK_MEDICINE)],
+            [InlineKeyboardButton(text="🎏 Культура", url=LINK_CULTURE)],
+            [
+                InlineKeyboardButton(
+                    text="⚔️ Арсенал",
+                    callback_data="menu_arsenal",
+                )
+            ],
+            [InlineKeyboardButton(text="🧌 Бестиарий", url=LINK_BESTIARY)],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_main")],
+        ]
+    )
+
+
+def arsenal_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="💣 Оружие",
+                    callback_data="menu_weapons",
+                )
+            ],
+            [InlineKeyboardButton(text="🛡️ Броня", url=LINK_ARMOR)],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_progress")],
+        ]
+    )
+
+
+def weapons_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🪓 Огнестрельное, энергетическое и холодное оружие",
+                    url=LINK_WEAPONS_MAIN,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🧪 Химическое и райдерское оружие, оборонительные комплексы",
+                    url=LINK_WEAPONS_CHEMICAL,
+                )
+            ],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_arsenal")],
         ]
     )
 
@@ -491,6 +562,28 @@ async def open_bio_menu(callback: CallbackQuery):
 @dp.callback_query(F.data == "menu_wasteland")
 async def open_wasteland_menu(callback: CallbackQuery):
     await edit_menu_message(callback, "🏜 Описание пустоши:", wasteland_menu())
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_progress")
+async def open_progress_menu(callback: CallbackQuery):
+    await edit_menu_message(
+        callback,
+        "🗺️ Научно-технический прогресс мира:",
+        progress_menu(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_arsenal")
+async def open_arsenal_menu(callback: CallbackQuery):
+    await edit_menu_message(callback, "⚔️ Арсенал:", arsenal_menu())
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "menu_weapons")
+async def open_weapons_menu(callback: CallbackQuery):
+    await edit_menu_message(callback, "💣 Оружие:", weapons_menu())
     await callback.answer()
 
 
