@@ -281,7 +281,7 @@ def get_taken_roles_text() -> str:
         "житель": "🪬 Жители",
         "гуль": "🧫 Гули",
         "райдер": "⛓️‍💥 Райдеры",
-        "бронь": "Бронь",
+        "бронь": "🌐 Бронь",
     }
 
     try:
@@ -386,7 +386,7 @@ def main_menu():
             ],
             [
                 InlineKeyboardButton(
-                    text="🫯 Занятые роли",
+                    text="💠 Занятые роли",
                     callback_data="menu_roles",
                 )
             ],
