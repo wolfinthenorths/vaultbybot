@@ -1,6 +1,9 @@
 import asyncio
+import csv
+import io
 import os
 import sqlite3
+import urllib.request
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F
@@ -59,12 +62,21 @@ LINK_WEAPONS_MAIN = "https://telegra.ph/Weapons-05-19-12"
 LINK_WEAPONS_CHEMICAL = "https://telegra.ph/Weapons-Chemical-Raiders--Defensive-systems-05-19"
 LINK_ARMOR = "https://telegra.ph/Armor-05-19-10"
 
-LINK_PROJECT_GUIDE = "https://example.com/project-guide"
+LINK_PROJECT_GUIDE = "https://telegra.ph/Guide-06-01-3"
 LINK_DND_GUIDE = "https://telegra.ph/DD-Guide-09-04"
 
 LINK_DEADLINES_RESTS = "https://docs.google.com/spreadsheets/d/10LewYnGJlR2BjWXj7mFiuBraQYppn9yBbJMXwcbT6HA/edit?usp=sharing"
 LINK_CAPS = "https://docs.google.com/spreadsheets/d/1iuFkiLPEaA770-iBCLJKuHaLkCY-_43GpY4xcrcwaX4/edit?usp=sharing"
 LINK_CHARACTER_STATS = "https://docs.google.com/spreadsheets/d/1cYEfxasIAu61BtAQEZBHV4yV5Ghm7_-BL_SsSFoiBG8/edit?usp=sharing"
+
+
+# ---------------- ТАБЛИЦА ЗАНЯТЫХ РОЛЕЙ ----------------
+
+ROLES_CSV_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1_U-WBDUNpM1OCos0x0PTiv544Qk2W8oCDHYPqCZsIDc"
+    "/export?format=csv&gid=0"
+)
 
 
 # ---------------- ШАБЛОНЫ БЫСТРЫХ ОТВЕТОВ ----------------
@@ -251,6 +263,98 @@ def get_blocked_users():
     return cursor.fetchall()
 
 
+# ---------------- ЗАНЯТЫЕ РОЛИ ----------------
+
+def normalize_category(category: str) -> str:
+    return category.strip().lower().replace("ё", "е")
+
+
+def get_taken_roles_text() -> str:
+    groups = {
+        "житель": [],
+        "гуль": [],
+        "райдер": [],
+        "бронь": [],
+    }
+
+    group_titles = {
+        "житель": "Жители",
+        "гуль": "Гули",
+        "райдер": "Райдеры",
+        "бронь": "Бронь",
+    }
+
+    try:
+        with urllib.request.urlopen(ROLES_CSV_URL, timeout=15) as response:
+            raw_data = response.read().decode("utf-8-sig")
+
+        reader = csv.reader(io.StringIO(raw_data))
+        rows = list(reader)
+
+        for row in rows[1:]:
+            if len(row) < 2:
+                continue
+
+            category = normalize_category(row[0])
+            character = row[1].strip()
+
+            if not category or not character:
+                continue
+
+            if category not in groups:
+                groups[category] = []
+
+            groups[category].append(character)
+
+    except Exception:
+        return (
+            "👥 Занятые роли\n\n"
+            "Не получилось загрузить таблицу. "
+            "Попробуйте немного позже."
+        )
+
+    lines = ["👥 Занятые роли"]
+
+    has_any_roles = False
+
+    for category in ["житель", "гуль", "райдер", "бронь"]:
+        characters = groups.get(category, [])
+
+        if not characters:
+            continue
+
+        has_any_roles = True
+        lines.append("")
+        lines.append(f"{group_titles[category]}:")
+
+        for character in characters:
+            lines.append(f"— {character}")
+
+    extra_categories = [
+        category for category in groups.keys()
+        if category not in {"житель", "гуль", "райдер", "бронь"}
+    ]
+
+    for category in extra_categories:
+        characters = groups.get(category, [])
+
+        if not characters:
+            continue
+
+        has_any_roles = True
+        lines.append("")
+        lines.append(f"{category.capitalize()}:")
+
+        for character in characters:
+            lines.append(f"— {character}")
+
+    if not has_any_roles:
+        lines.append("")
+        lines.append("Пока список пуст.")
+
+    return "\n".join(lines)
+
+
 # ---------------- ТЕКСТЫ ----------------
 
 WELCOME_TEXT = (
@@ -278,6 +382,12 @@ def main_menu():
                 InlineKeyboardButton(
                     text="☢️ Основная информация",
                     callback_data="menu_info",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👥 Занятые роли",
+                    callback_data="menu_roles",
                 )
             ],
             [
@@ -321,14 +431,23 @@ def info_menu():
     )
 
 
+def roles_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Обновить список", callback_data="menu_roles")],
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_main")],
+        ]
+    )
+
+
 def bio_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⚙️ Организации", url=LINK_ORGANIZATIONS)],
-            [InlineKeyboardButton(text="🪴 Описание бункеров", url=LINK_VAULTS)],
+            [InlineKeyboardButton(text="🪴 Описание Бункеров", url=LINK_VAULTS)],
             [
                 InlineKeyboardButton(
-                    text="🏜 Описание пустоши",
+                    text="🏜 Описание Пустоши",
                     callback_data="menu_wasteland",
                 )
             ],
@@ -424,7 +543,7 @@ def tables_menu():
             ],
             [
                 InlineKeyboardButton(
-                    text="🪙 Таблица крышек",
+                    text="🪙 Таблица Крышек",
                     url=LINK_CAPS,
                 )
             ],
@@ -549,6 +668,24 @@ async def open_info_menu(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data == "menu_roles")
+async def open_roles_menu(callback: CallbackQuery):
+    roles_text = get_taken_roles_text()
+
+    if callback.message.photo:
+        await callback.message.answer(
+            roles_text,
+            reply_markup=roles_menu(),
+        )
+    else:
+        await callback.message.edit_text(
+            roles_text,
+            reply_markup=roles_menu(),
+        )
+
+    await callback.answer()
+
+
 @dp.callback_query(F.data == "menu_bio")
 async def open_bio_menu(callback: CallbackQuery):
     await edit_menu_message(
@@ -561,7 +698,7 @@ async def open_bio_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "menu_wasteland")
 async def open_wasteland_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "🏜 Описание пустоши:", wasteland_menu())
+    await edit_menu_message(callback, "🏜 Описание Пустоши:", wasteland_menu())
     await callback.answer()
 
 
