@@ -278,9 +278,9 @@ def get_taken_roles_text() -> str:
     }
 
     group_titles = {
-        "житель": "Жители",
-        "гуль": "Гули",
-        "райдер": "Райдеры",
+        "житель": "🪬 Жители",
+        "гуль": "🧫 Гули",
+        "райдер": "⛓️‍💥 Райдеры",
         "бронь": "Бронь",
     }
 
@@ -308,12 +308,12 @@ def get_taken_roles_text() -> str:
 
     except Exception:
         return (
-            "👥 Занятые роли\n\n"
+            "🫯 Занятые роли\n\n"
             "Не получилось загрузить таблицу. "
             "Попробуйте немного позже."
         )
 
-    lines = ["👥 Занятые роли"]
+    lines = ["🫯 Занятые роли"]
 
     has_any_roles = False
 
@@ -386,7 +386,7 @@ def main_menu():
             ],
             [
                 InlineKeyboardButton(
-                    text="👥 Занятые роли",
+                    text="🫯 Занятые роли",
                     callback_data="menu_roles",
                 )
             ],
