@@ -313,7 +313,7 @@ def get_taken_roles_text() -> str:
             "Попробуйте немного позже."
         )
 
-    lines = ["🫯 Занятые роли"]
+    lines = ["💠 Занятые роли"]
 
     has_any_roles = False
 
