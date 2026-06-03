@@ -5,6 +5,7 @@ import os
 import sqlite3
 import urllib.request
 from datetime import datetime
+from urllib.parse import quote
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ChatType
@@ -14,6 +15,7 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InputMediaPhoto,
     Message,
 )
 
@@ -32,9 +34,22 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
-# ---------------- КАРТИНКА ДЛЯ ПРИВЕТСТВИЯ ----------------
+# ---------------- КАРТИНКИ ----------------
 
-WELCOME_IMAGE = "https://raw.githubusercontent.com/wolfinthenorths/vaultbybot/main/f603e39e58f392f60bad5.jpg"
+GITHUB_RAW_BASE = "https://raw.githubusercontent.com/wolfinthenorths/vaultbybot/main"
+
+
+def github_image(filename: str) -> str:
+    return f"{GITHUB_RAW_BASE}/{quote(filename)}"
+
+
+WELCOME_IMAGE = github_image("f603e39e58f392f60bad5.jpg")
+IMAGE_INFO = github_image("Information.png")
+IMAGE_ROLES = github_image("Reservation.png")
+IMAGE_DOCUMENTS = github_image("Documents.png")
+IMAGE_PROGRESS = github_image("Scientific and Technological Progress.png")
+IMAGE_GUIDES = github_image("Guides.png")
+IMAGE_TABLES = github_image("Tables.png")
 
 
 # ---------------- ССЫЛКИ НА ДОКУМЕНТЫ ----------------
@@ -269,6 +284,24 @@ def normalize_category(category: str) -> str:
     return category.strip().lower().replace("ё", "е")
 
 
+def canonical_category(category: str) -> str:
+    value = normalize_category(category)
+
+    if value in {"житель", "жители"}:
+        return "житель"
+
+    if value in {"гуль", "гули"}:
+        return "гуль"
+
+    if value in {"райдер", "райдеры"}:
+        return "райдер"
+
+    if value in {"бронь", "брони", "забронировано"}:
+        return "бронь"
+
+    return value
+
+
 def get_taken_roles_text() -> str:
     groups = {
         "житель": [],
@@ -295,7 +328,7 @@ def get_taken_roles_text() -> str:
             if len(row) < 2:
                 continue
 
-            category = normalize_category(row[0])
+            category = canonical_category(row[0])
             character = row[1].strip()
 
             if not category or not character:
@@ -308,12 +341,18 @@ def get_taken_roles_text() -> str:
 
     except Exception:
         return (
-            "🫯 Занятые роли\n\n"
+            "💠 Занятые роли\n\n"
             "Не получилось загрузить таблицу. "
             "Попробуйте немного позже."
         )
 
-    lines = ["💠 Занятые роли"]
+    lines = [
+        "💠 Занятые роли",
+        "",
+        "Ниже представлен список уже занятых ролей. "
+        "Сверьтесь с ним перед бронированием — система учёта, конечно, "
+        "пережила ядерный апокалипсис, но дубликаты всё ещё не любит.",
+    ]
 
     has_any_roles = False
 
@@ -328,7 +367,7 @@ def get_taken_roles_text() -> str:
         lines.append(f"{group_titles[category]}:")
 
         for character in characters:
-            lines.append(f"— {character}")
+            lines.append(f"✧ {character}")
 
     extra_categories = [
         category for category in groups.keys()
@@ -346,7 +385,7 @@ def get_taken_roles_text() -> str:
         lines.append(f"{category.capitalize()}:")
 
         for character in characters:
-            lines.append(f"— {character}")
+            lines.append(f"✧ {character}")
 
     if not has_any_roles:
         lines.append("")
@@ -364,6 +403,45 @@ WELCOME_TEXT = (
     "Чтобы забронировать роль, напишите её сообщением "
     "или задайте интересующий вопрос — я помогу не хуже "
     "синта третьего поколения!"
+)
+
+
+INFO_TEXT = (
+    "☢️ Основная информация\n\n"
+    "Здесь собраны основные сведения о проекте: всё, что нужно знать "
+    "перед тем, как открыть гермодверь и шагнуть в наше Убежище."
+)
+
+
+BIO_TEXT = (
+    "🏷️ Документы для написания биографии\n\n"
+    "Не знаете, как написать биографию? Сейчас поможем. Волт-Бой "
+    "гарантирует, что приведенные ниже документы помогут Вам при ее написании."
+)
+
+
+PROGRESS_TEXT = (
+    "🗺️ Научно-технический прогресс мира\n\n"
+    "Чтобы лучше понять мир, окружающий Ваших героев, ознакомьтесь "
+    "с «Атомными Хрониками»: здесь собраны сведения о технологиях, "
+    "медицине, культуре и прочих чудесах прогресса, которые каким-то "
+    "образом пережили второй конец света."
+)
+
+
+GUIDES_TEXT = (
+    "📺 Гайды\n\n"
+    "Здесь собраны путеводители по проекту: от основных правил до "
+    "полезных подсказок, которые помогут не заблудиться в коридорах "
+    "бункера и не погибнуть от бюрократии раньше времени."
+)
+
+
+TABLES_TEXT = (
+    "📂 Таблицы для игроков\n\n"
+    "Не можете вспомнить, когда писать пост, сколько крышек осталось "
+    "на счету и где вообще всё это посмотреть? Вам сюда — учетные "
+    "терминалы уже прогреты."
 )
 
 
@@ -603,21 +681,60 @@ def support_actions_keyboard():
 
 # ---------------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ----------------
 
-async def edit_menu_message(
-    callback: CallbackQuery,
+async def send_photo_menu(
+    message: Message,
+    image_url: str,
     text: str,
     keyboard: InlineKeyboardMarkup,
 ):
-    if callback.message.photo:
-        await callback.message.edit_caption(
+    try:
+        await message.answer_photo(
+            photo=image_url,
             caption=text,
             reply_markup=keyboard,
         )
-    else:
-        await callback.message.edit_text(
+    except TelegramBadRequest:
+        await message.answer(
             text,
             reply_markup=keyboard,
         )
+
+
+async def edit_photo_menu(
+    callback: CallbackQuery,
+    image_url: str,
+    text: str,
+    keyboard: InlineKeyboardMarkup,
+):
+    try:
+        if callback.message.photo:
+            media = InputMediaPhoto(media=image_url, caption=text)
+            await callback.message.edit_media(
+                media=media,
+                reply_markup=keyboard,
+            )
+        else:
+            await callback.message.delete()
+            await callback.message.answer_photo(
+                photo=image_url,
+                caption=text,
+                reply_markup=keyboard,
+            )
+
+    except TelegramBadRequest:
+        try:
+            if callback.message.photo:
+                await callback.message.edit_caption(
+                    caption=text,
+                    reply_markup=keyboard,
+                )
+            else:
+                await callback.message.edit_text(
+                    text,
+                    reply_markup=keyboard,
+                )
+        except TelegramBadRequest:
+            pass
 
 
 def normalize_command(text: str) -> str:
@@ -628,24 +745,31 @@ def normalize_command(text: str) -> str:
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    try:
-        await message.answer_photo(
-            photo=WELCOME_IMAGE,
-            caption=WELCOME_TEXT,
-            reply_markup=main_menu(),
-        )
-    except TelegramBadRequest:
-        await message.answer(
-            WELCOME_TEXT,
-            reply_markup=main_menu(),
-        )
+    await send_photo_menu(
+        message=message,
+        image_url=WELCOME_IMAGE,
+        text=WELCOME_TEXT,
+        keyboard=main_menu(),
+    )
 
 
 @dp.message(Command("info"))
 async def info_command(message: Message):
-    await message.answer(
-        WELCOME_TEXT,
-        reply_markup=main_menu(),
+    await send_photo_menu(
+        message=message,
+        image_url=WELCOME_IMAGE,
+        text=WELCOME_TEXT,
+        keyboard=main_menu(),
+    )
+
+
+@dp.message(Command("menu"))
+async def menu_command(message: Message):
+    await send_photo_menu(
+        message=message,
+        image_url=WELCOME_IMAGE,
+        text=WELCOME_TEXT,
+        keyboard=main_menu(),
     )
 
 
@@ -658,81 +782,77 @@ async def chat_id_command(message: Message):
 
 @dp.callback_query(F.data == "menu_main")
 async def open_main_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, WELCOME_TEXT, main_menu())
+    await edit_photo_menu(callback, WELCOME_IMAGE, WELCOME_TEXT, main_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_info")
 async def open_info_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "☢️ Основная информация:", info_menu())
+    await edit_photo_menu(callback, IMAGE_INFO, INFO_TEXT, info_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_roles")
 async def open_roles_menu(callback: CallbackQuery):
     roles_text = get_taken_roles_text()
-
-    if callback.message.photo:
-        await callback.message.answer(
-            roles_text,
-            reply_markup=roles_menu(),
-        )
-    else:
-        await callback.message.edit_text(
-            roles_text,
-            reply_markup=roles_menu(),
-        )
-
+    await edit_photo_menu(callback, IMAGE_ROLES, roles_text, roles_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_bio")
 async def open_bio_menu(callback: CallbackQuery):
-    await edit_menu_message(
-        callback,
-        "🏷️ Документы для написания биографии:",
-        bio_menu(),
-    )
+    await edit_photo_menu(callback, IMAGE_DOCUMENTS, BIO_TEXT, bio_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_wasteland")
 async def open_wasteland_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "🏜 Описание Пустоши:", wasteland_menu())
+    await edit_photo_menu(
+        callback,
+        IMAGE_DOCUMENTS,
+        "🏜 Описание Пустоши:",
+        wasteland_menu(),
+    )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_progress")
 async def open_progress_menu(callback: CallbackQuery):
-    await edit_menu_message(
-        callback,
-        "🗺️ Научно-технический прогресс мира:",
-        progress_menu(),
-    )
+    await edit_photo_menu(callback, IMAGE_PROGRESS, PROGRESS_TEXT, progress_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_arsenal")
 async def open_arsenal_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "⚔️ Арсенал:", arsenal_menu())
+    await edit_photo_menu(
+        callback,
+        IMAGE_PROGRESS,
+        "⚔️ Арсенал:",
+        arsenal_menu(),
+    )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_weapons")
 async def open_weapons_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "💣 Оружие:", weapons_menu())
+    await edit_photo_menu(
+        callback,
+        IMAGE_PROGRESS,
+        "💣 Оружие:",
+        weapons_menu(),
+    )
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_guides")
 async def open_guides_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "📺 Гайды:", guides_menu())
+    await edit_photo_menu(callback, IMAGE_GUIDES, GUIDES_TEXT, guides_menu())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "menu_tables")
 async def open_tables_menu(callback: CallbackQuery):
-    await edit_menu_message(callback, "📂 Таблицы для игроков:", tables_menu())
+    await edit_photo_menu(callback, IMAGE_TABLES, TABLES_TEXT, tables_menu())
     await callback.answer()
 
 
