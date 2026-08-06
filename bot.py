@@ -58,7 +58,7 @@ LINK_SETTING = "https://telegra.ph/Setting-12-28-5"
 LINK_PLOT = "https://telegra.ph/Main-plot-12-28"
 LINK_CLASSIFICATION = "https://telegra.ph/Classification-05-14-8"
 LINK_RULES = "https://telegra.ph/Rules-12-28-96"
-LINK_FAQ = "https://telegra.ph/FAQ-08-03-25"
+LINK_FAQ = "https://telegra.ph/FAQ-08-06-18"
 
 LINK_ORGANIZATIONS = "https://telegra.ph/Organizations-07-15"
 LINK_VAULTS = "https://telegra.ph/List-of-bunkers-07-15"
