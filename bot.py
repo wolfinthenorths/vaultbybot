@@ -1,7 +1,9 @@
 import asyncio
 import csv
 import io
+import logging
 import os
+import re
 import sqlite3
 import urllib.request
 from datetime import datetime
@@ -181,6 +183,38 @@ def get_user_id_by_support_message(support_message_id: int):
     )
     result = cursor.fetchone()
     return result[0] if result else None
+
+
+def find_support_user_id(message: Message):
+    """Recover recipient IDs after ephemeral Railway SQLite resets."""
+    if not message:
+        return None
+
+    stored_id = get_user_id_by_support_message(message.message_id)
+    if stored_id:
+        return stored_id
+
+    text = message.text or message.caption or ""
+    match = re.search(r"🆔\s*ID:\s*(\d+)", text)
+    if match:
+        return int(match.group(1))
+
+    markup = message.reply_markup
+    if markup:
+        for row in markup.inline_keyboard:
+            for button in row:
+                parts = (button.callback_data or "").split(":")
+                if len(parts) == 3 and parts[0] in {"tpl", "admin"} and parts[2].isdigit():
+                    return int(parts[2])
+
+    return None
+
+
+def find_callback_user_id(callback: CallbackQuery):
+    parts = (callback.data or "").split(":")
+    if len(parts) == 3 and parts[2].isdigit():
+        return int(parts[2])
+    return find_support_user_id(callback.message)
 
 
 def save_user_profile(user_id: int, user_info: str):
@@ -635,41 +669,41 @@ def tables_menu():
 
 # ---------------- КНОПКИ ДЛЯ АДМИНОВ В ЧАТЕ ПОДДЕРЖКИ ----------------
 
-def support_actions_keyboard():
+def support_actions_keyboard(user_id: int):
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text="💬 Поставили бронь",
-                    callback_data="tpl:booking",
+                    callback_data=f"tpl:booking:{user_id}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="💬 Роль занята",
-                    callback_data="tpl:role_taken",
+                    callback_data=f"tpl:role_taken:{user_id}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="💬 Вступить во флуд",
-                    callback_data="tpl:flood_question",
+                    callback_data=f"tpl:flood_question:{user_id}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="💬 Добро пожаловать",
-                    callback_data="tpl:flood_welcome",
+                    callback_data=f"tpl:flood_welcome:{user_id}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🚫 Заблокировать",
-                    callback_data="admin:block",
+                    callback_data=f"admin:block:{user_id}",
                 ),
                 InlineKeyboardButton(
                     text="✅ Разблокировать",
-                    callback_data="admin:unblock",
+                    callback_data=f"admin:unblock:{user_id}",
                 ),
             ],
         ]
@@ -791,7 +825,7 @@ async def open_info_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "menu_roles")
 async def open_roles_menu(callback: CallbackQuery):
-    roles_text = get_taken_roles_text()
+    roles_text = await asyncio.to_thread(get_taken_roles_text)
     await edit_photo_menu(callback, IMAGE_ROLES, roles_text, roles_menu())
     await callback.answer()
 
@@ -864,7 +898,7 @@ async def send_template_to_user(callback: CallbackQuery):
         )
         return
 
-    user_id = get_user_id_by_support_message(callback.message.message_id)
+    user_id = find_callback_user_id(callback)
 
     if not user_id:
         await callback.answer("Не удалось определить пользователя.", show_alert=True)
@@ -874,7 +908,7 @@ async def send_template_to_user(callback: CallbackQuery):
         await callback.answer("Пользователь заблокирован.", show_alert=True)
         return
 
-    template_key = callback.data.split(":", 1)[1]
+    template_key = callback.data.split(":")[1]
     text = TEMPLATES.get(template_key)
 
     if not text:
@@ -907,13 +941,13 @@ async def admin_action(callback: CallbackQuery):
         )
         return
 
-    user_id = get_user_id_by_support_message(callback.message.message_id)
+    user_id = find_callback_user_id(callback)
 
     if not user_id:
         await callback.answer("Не удалось определить пользователя.", show_alert=True)
         return
 
-    action = callback.data.split(":", 1)[1]
+    action = callback.data.split(":")[1]
 
     if action == "block":
         block_user(user_id)
@@ -939,6 +973,30 @@ async def handle_support_chat_message(message: Message):
     if message.text:
         command = normalize_command(message.text)
 
+        if command == "/reply":
+            parts = message.text.split(maxsplit=2)
+            if len(parts) < 3 or not parts[1].isdigit():
+                await message.reply(
+                    "Формат: /reply ID текст. ID указан в карточке "
+                    "«📩 Новое сообщение в бота»."
+                )
+                return
+
+            recipient_id = int(parts[1])
+            if is_user_blocked(recipient_id):
+                await message.reply("🚫 Этот пользователь заблокирован.")
+                return
+
+            try:
+                await bot.send_message(chat_id=recipient_id, text=parts[2])
+                await message.reply("✅ Ответ отправлен пользователю.")
+            except TelegramForbiddenError:
+                await message.reply("❌ Пользователь заблокировал бота.")
+            except TelegramBadRequest as exc:
+                logging.exception("Manual admin reply failed")
+                await message.reply(f"❌ Не удалось отправить сообщение: {exc}")
+            return
+
         if command == "/blocked":
             blocked = get_blocked_users()
 
@@ -961,9 +1019,7 @@ async def handle_support_chat_message(message: Message):
                 )
                 return
 
-            user_id = get_user_id_by_support_message(
-                message.reply_to_message.message_id
-            )
+            user_id = find_support_user_id(message.reply_to_message)
 
             if not user_id:
                 await message.reply(
@@ -985,9 +1041,15 @@ async def handle_support_chat_message(message: Message):
     if not message.reply_to_message:
         return
 
-    user_id = get_user_id_by_support_message(message.reply_to_message.message_id)
+    user_id = find_support_user_id(message.reply_to_message)
 
     if not user_id:
+        if message.reply_to_message.from_user and message.reply_to_message.from_user.id == bot.id:
+            await message.reply(
+                "Не могу определить получателя старого сообщения после перезапуска. "
+                "Ответьте на карточку «📩 Новое сообщение в бота», где указан ID, "
+                "или напишите /reply ID текст."
+            )
         return
 
     if is_user_blocked(user_id):
@@ -1063,16 +1125,22 @@ async def message_from_user(message: Message):
     if message.text:
         copied = await bot.send_message(
             chat_id=SUPPORT_CHAT_ID,
-            text=f"💬 Сообщение пользователя:\n\n{message.text}",
-            reply_markup=support_actions_keyboard(),
+            text=f"💬 Сообщение пользователя:\n\n{message.text}\n\n🆔 ID: {user.id}",
+            reply_markup=support_actions_keyboard(user.id),
         )
         save_message_map(copied.message_id, user.id)
     else:
+        copy_options = {}
+        if message.photo or message.video or message.document or message.audio or message.animation or message.voice:
+            id_footer = f"\n\n🆔 ID: {user.id}"
+            copy_options["caption"] = (message.caption or "")[:1024 - len(id_footer)] + id_footer
+
         copied = await bot.copy_message(
             chat_id=SUPPORT_CHAT_ID,
             from_chat_id=message.chat.id,
             message_id=message.message_id,
-            reply_markup=support_actions_keyboard(),
+            reply_markup=support_actions_keyboard(user.id),
+            **copy_options,
         )
         save_message_map(copied.message_id, user.id)
 
@@ -1083,6 +1151,7 @@ async def message_from_user(message: Message):
 # ---------------- ЗАПУСК БОТА ----------------
 
 async def main():
+    logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 
