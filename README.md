@@ -43,6 +43,12 @@ Telegram limit, author information is on the keyboard instead. Manual replies
 and template responses update the source card's delivery status, without
 duplicating the response in the group. Errors remain visible.
 
+The contact hint is included in the welcome card on a user's first `/start`
+only. Its displayed state is stored in the existing `first_reply_sent` table
+for compatibility with previous deployments. Ordinary messages, menu refreshes,
+and bot updates do not trigger this hint. Users who have already received the
+old acknowledgement do not receive it again.
+
 - Reply to a card with text or a supported attachment to answer its author.
 - `/reply ID text`: answer a specific Telegram user ID.
 - `/block` or `/unblock`: reply to a card, or append a user ID.

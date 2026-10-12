@@ -100,7 +100,7 @@ class BotTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Здравствуйте!", incoming[0].text)
         self.assertGreaterEqual(len(incoming[0].entities), 3)
         self.assertEqual(self.db.get_user_id(501), 42)
-        self.assertEqual(len(self.calls("sendMessage", 42)), 1)
+        self.assertEqual(len(self.calls("sendMessage", 42)), 0)
 
     async def test_maximum_text_remains_one_message_and_is_not_truncated(self):
         message = self.message(text="x" * 4096)
@@ -130,32 +130,58 @@ class BotTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(copies[0].caption)
         self.assertFalse(self.calls("sendMessage", CHAT_ID))
 
-    async def test_replayed_update_does_not_duplicate_incoming_or_first_reply(self):
+    async def test_replayed_update_does_not_duplicate_incoming_or_send_notification(self):
         message = self.message(text="Вопрос")
         await app.message_from_user(message)
         await app.message_from_user(message)
         self.assertEqual(len(self.calls("sendMessage", CHAT_ID)), 1)
-        self.assertEqual(len(self.calls("sendMessage", 42)), 1)
+        self.assertEqual(len(self.calls("sendMessage", 42)), 0)
 
-    async def test_simultaneous_messages_send_only_one_first_reply(self):
+    async def test_simultaneous_messages_do_not_send_contact_hint(self):
         await asyncio.gather(app.message_from_user(self.message(1, text="Первый")),
                              app.message_from_user(self.message(2, text="Второй")))
         self.assertEqual(len(self.calls("sendMessage", CHAT_ID)), 2)
-        self.assertEqual(len(self.calls("sendMessage", 42)), 1)
+        self.assertEqual(len(self.calls("sendMessage", 42)), 0)
 
-    async def test_failed_first_reply_is_not_marked_sent(self):
+    async def test_failed_welcome_is_not_marked_shown(self):
         def fail_private(method):
-            if method.__api_method__ == "sendMessage" and method.chat_id == 42:
+            if method.__api_method__ in {"sendMessage", "sendPhoto"} and method.chat_id == 42:
                 raise TelegramForbiddenError(method, "Forbidden")
         self.session.fail = fail_private
-        message = self.message(text="Вопрос")
+        message = self.message(text="/start")
         with self.assertRaises(TelegramForbiddenError):
-            await app.message_from_user(message)
+            await app.start(message)
         self.assertFalse(self.db.first_reply_sent(42))
         self.session.fail = None
-        await app.message_from_user(message)
+        await app.start(message)
         self.assertTrue(self.db.first_reply_sent(42))
-        self.assertEqual(len(self.calls("sendMessage", CHAT_ID)), 1)
+        self.assertEqual(len(self.calls("sendMessage", CHAT_ID)), 0)
+
+    async def test_contact_hint_is_in_first_welcome_only(self):
+        await app.start(self.message(text="/start"))
+        await app.start(self.message(2, text="/start"))
+        welcomes = self.calls("sendPhoto", 42)
+        self.assertEqual(len(welcomes), 2)
+        self.assertIn(app.CONTACT_HINT, welcomes[0].caption)
+        self.assertNotIn(app.CONTACT_HINT, welcomes[1].caption)
+        self.assertFalse(self.calls("sendMessage", 42))
+
+    async def test_existing_acknowledgement_is_not_repeated_on_start(self):
+        self.db.mark_first_reply_sent(42)
+        await app.start(self.message(text="/start"))
+        self.assertNotIn(app.CONTACT_HINT, self.calls("sendPhoto", 42)[0].caption)
+
+    async def test_start_hint_state_survives_database_reopen(self):
+        await app.start(self.message(text="/start"))
+        path = self.db.path
+        self.db.close()
+        self.db = Database(path, CHAT_ID)
+        app.database = self.db
+        self.addCleanup(self.db.close)
+        await app.start(self.message(2, text="/start"))
+        await app.message_from_user(self.message(3, text="Вопрос после обновления"))
+        self.assertNotIn(app.CONTACT_HINT, self.calls("sendPhoto", 42)[1].caption)
+        self.assertFalse(self.calls("sendMessage", 42))
 
     async def test_manual_reply_preserves_media_and_has_no_duplicate_success_post(self):
         message = self.message(11, CHAT_ID, self.admin, text="Наш ответ", reply_to_message=self.card())

@@ -230,7 +230,7 @@ def get_user_info(user_id: int) -> str:
     return database.get_user_info(user_id)
 
 
-def should_send_first_message_reply(user_id: int) -> bool:
+def should_show_contact_hint(user_id: int) -> bool:
     return not database.first_reply_sent(user_id)
 
 
@@ -414,8 +414,8 @@ ARSENAL_TEXT = "Выберите раздел арсенала:"
 WEAPONS_TEXT = "Выберите тип оружия:"
 
 
-FIRST_MESSAGE_REPLY = (
-    "Ваше сообщение передано Волт-Бою 🫡\n"
+CONTACT_HINT = (
+    "Чтобы связаться с Волт-Боем, отправьте сообщение 🫡\n"
     "Мы ответим вам здесь, в этом чате."
 )
 
@@ -763,12 +763,22 @@ def delivery_error(exc):
 
 @dp.message(CommandStart(), F.chat.type == ChatType.PRIVATE)
 async def start(message: Message):
-    await send_photo_menu(
-        message=message,
-        image_url=WELCOME_IMAGE,
-        text=WELCOME_TEXT,
-        keyboard=main_menu(),
-    )
+    user = message.from_user
+    if not user or user.is_bot:
+        return
+    async with get_lock(user_locks, user.id):
+        if is_user_blocked(user.id):
+            return
+        show_hint = should_show_contact_hint(user.id)
+        text = WELCOME_TEXT + (f"\n\n{CONTACT_HINT}" if show_hint else "")
+        await send_photo_menu(
+            message=message,
+            image_url=WELCOME_IMAGE,
+            text=text,
+            keyboard=main_menu(),
+        )
+        if show_hint:
+            database.mark_first_reply_sent(user.id)
 
 
 @dp.message(Command("info"), F.chat.type == ChatType.PRIVATE)
@@ -1088,9 +1098,6 @@ async def message_from_user(message: Message):
                 return
             save_message_map(copied.message_id, user.id)
             database.mark_incoming_delivered(user.id, message.message_id, copied.message_id)
-        if should_send_first_message_reply(user.id):
-            await message.answer(FIRST_MESSAGE_REPLY)
-            database.mark_first_reply_sent(user.id)
 
 
 # ---------------- ЗАПУСК БОТА ----------------
