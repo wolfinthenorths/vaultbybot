@@ -96,11 +96,12 @@ IMAGE_TABLES = github_image("Tables.png")
 # ---------------- ССЫЛКИ НА ДОКУМЕНТЫ ----------------
 
 LINK_SETTING = "https://telegra.ph/Setting-12-28-5"
-LINK_PLOT = "https://telegra.ph/Main-plot-12-28"
-LINK_CLASSIFICATION = "https://telegra.ph/Classification-05-14-8"
-LINK_RULES = "https://telegra.ph/Rules-12-28-96"
+LINK_PLOT = "https://telegra.ph/Main-plot-10-13"
+LINK_CLASSIFICATION = "https://telegra.ph/Classification-10-13-22"
+LINK_RULES = "https://telegra.ph/Rules-10-13-151"
 LINK_FAQ = "https://dotdossier.com/p/faq-07-10-2026"
 
+LINK_TEMPLATE = "https://telegra.ph/Template-10-13-15"
 LINK_ORGANIZATIONS = "https://dotdossier.com/p/organizations-07-10-2026"
 LINK_VAULTS = "https://dotdossier.com/p/list-of-bunkers-07-10-2026"
 
@@ -120,6 +121,7 @@ LINK_ARMOR = "https://dotdossier.com/p/armor-10-10-2026"
 
 LINK_PROJECT_GUIDE = "https://telegra.ph/Guide-06-01-3"
 LINK_DND_GUIDE = "https://telegra.ph/DD-Guide-09-04"
+LINK_MANUAL = "https://dotdossier.com/p/metodicheskoe-posobie-po-sisteme-d-d-12-10-2026"
 
 LINK_DEADLINES_RESTS = "https://docs.google.com/spreadsheets/d/10LewYnGJlR2BjWXj7mFiuBraQYppn9yBbJMXwcbT6HA/edit?usp=sharing"
 LINK_CAPS = "https://docs.google.com/spreadsheets/d/1iuFkiLPEaA770-iBCLJKuHaLkCY-_43GpY4xcrcwaX4/edit?usp=sharing"
@@ -495,6 +497,7 @@ def roles_menu(page: int = 0, total: int = 1):
 def bio_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Шаблон", url=LINK_TEMPLATE)],
             [InlineKeyboardButton(text="⚙️ Организации", url=LINK_ORGANIZATIONS)],
             [InlineKeyboardButton(text="🪴 Описание Бункеров", url=LINK_VAULTS)],
             [
@@ -579,6 +582,7 @@ def guides_menu():
         inline_keyboard=[
             [InlineKeyboardButton(text="📘 Гайд по проекту", url=LINK_PROJECT_GUIDE)],
             [InlineKeyboardButton(text="🎲 Гайд по ДнД", url=LINK_DND_GUIDE)],
+            [InlineKeyboardButton(text="📚 Методичка", url=LINK_MANUAL)],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_main")],
         ]
     )
